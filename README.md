@@ -171,3 +171,49 @@ Backend:
 cd server
 npm start
 ```
+
+## Deployment (Recommended Hybrid: Vercel + Render)
+
+Use this option for fastest and most stable deployment with current code:
+
+- Frontend: Vercel
+- Backend: Render
+- Database: MongoDB Atlas
+
+### 1) Deploy Backend on Render
+
+You can use the existing `render.yaml` or create service manually.
+
+Required backend env var:
+
+- `MONGO_URI`
+
+Optional Firebase env vars (only if needed):
+
+- `FIREBASE_PROJECT_ID`
+- `FIREBASE_CLIENT_EMAIL`
+- `FIREBASE_PRIVATE_KEY`
+
+After deploy, copy backend URL:
+
+- Example: `https://acadalert-api.onrender.com`
+
+### 2) Deploy Frontend on Vercel
+
+In Vercel project settings:
+
+- Root Directory: `client`
+- Build Command: `npm run build`
+- Output Directory: `dist`
+
+Set frontend env var:
+
+- `VITE_API_URL=https://<your-render-backend>/api`
+
+This repo includes `client/vercel.json` rewrite rules for React routes.
+
+### 3) Final Check
+
+- Open frontend URL
+- Log in with student/staff/coordinator accounts
+- Verify API calls and dashboard data loading
