@@ -268,6 +268,16 @@ function StudentDashboard() {
     return [...student.risk.breakdown].sort((a, b) => Number(b.points || 0) - Number(a.points || 0));
   }, [student]);
 
+  const getMeetingStatusLabel = (meeting) => {
+    if (meeting.createdByRole === "student") {
+      if (meeting.status === "Approved") return "Accepted";
+      return meeting.status;
+    }
+
+    if (meeting.status === "Rejected") return "Not Completed";
+    return meeting.status;
+  };
+
   if (error) {
     return (
       <DashboardLayout>
@@ -502,9 +512,11 @@ function StudentDashboard() {
                   <table className="table table-modern table-sm align-middle">
                     <thead>
                       <tr>
+                        <th>Requested By</th>
                         <th>Request Type</th>
                         <th>Description</th>
                         <th>Status</th>
+                        <th>Meeting Time</th>
                         <th>Requested On</th>
                       </tr>
                     </thead>
@@ -512,15 +524,17 @@ function StudentDashboard() {
                       {meetingRequests.length ? (
                         meetingRequests.map((meeting) => (
                           <tr key={meeting._id}>
+                            <td>{meeting.createdByRole === "student" ? "You" : "Staff"}</td>
                             <td>{meeting.requestType}</td>
                             <td>{meeting.description || "-"}</td>
-                            <td>{meeting.status}</td>
+                            <td>{getMeetingStatusLabel(meeting)}</td>
+                            <td>{meeting.scheduledAt ? new Date(meeting.scheduledAt).toLocaleString() : "Not assigned"}</td>
                             <td>{new Date(meeting.createdAt).toLocaleDateString()}</td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={4} className="text-muted">No meeting requests submitted yet.</td>
+                          <td colSpan={6} className="text-muted">No meeting requests submitted yet.</td>
                         </tr>
                       )}
                     </tbody>

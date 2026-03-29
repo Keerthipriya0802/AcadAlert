@@ -43,6 +43,8 @@ function StaffDashboard() {
   });
   const [goals, setGoals] = useState([]);
   const [expandedMeetingId, setExpandedMeetingId] = useState("");
+  const [meetingTab, setMeetingTab] = useState("student");
+  const [meetingTimeInputs, setMeetingTimeInputs] = useState({});
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState("");
 
@@ -120,6 +122,31 @@ function StaffDashboard() {
     [students]
   );
 
+  const studentRequestedMeetings = useMemo(
+    () => meetingRequests.filter((meeting) => meeting.createdByRole === "student"),
+    [meetingRequests]
+  );
+
+  const staffRequestedMeetings = useMemo(
+    () => meetingRequests.filter((meeting) => meeting.createdByRole === "staff"),
+    [meetingRequests]
+  );
+
+  const visibleMeetingRequests = meetingTab === "student" ? studentRequestedMeetings : staffRequestedMeetings;
+
+  const getMeetingStatusLabel = (meeting) => {
+    if (meeting.createdByRole === "student") {
+      if (meeting.status === "Approved") return "Accepted";
+      if (meeting.status === "Scheduled") return "Accepted";
+      return meeting.status;
+    }
+
+    if (meeting.status === "Rejected") return "Not Completed";
+    if (meeting.status === "Approved") return "Completed";
+    if (meeting.status === "Completed") return "Completed";
+    return meeting.status;
+  };
+
   const submitMeeting = async (event) => {
     event.preventDefault();
     await api.post("/meeting-request", {
@@ -134,9 +161,39 @@ function StaffDashboard() {
     await loadData();
   };
 
-  const updateMeetingStatus = async (meetingId, status) => {
+  const updateMeetingStatus = async (meetingId, status, createdByRole) => {
     await api.put(`/meeting-requests/${meetingId}`, { status });
-    setToast(`Request ${status.toLowerCase()}`);
+
+    let message = status.toLowerCase();
+    if (createdByRole === "student") {
+      if (status === "Approved") message = "accepted";
+      if (status === "Rejected") message = "rejected";
+    } else {
+      if (status === "Completed") message = "completed";
+      if (status === "Rejected") message = "not completed";
+    }
+
+    setToast(`Request marked as ${message}`);
+    await loadData();
+  };
+
+  const updateMeetingTimeInput = (meetingId, value) => {
+    setMeetingTimeInputs((prev) => ({ ...prev, [meetingId]: value }));
+  };
+
+  const scheduleMeeting = async ({ meetingId, status, successMessage }) => {
+    const selectedTime = meetingTimeInputs[meetingId];
+    if (!selectedTime) {
+      setToast("Please select meeting time");
+      return;
+    }
+
+    await api.put(`/meeting-requests/${meetingId}`, {
+      status,
+      scheduledAt: selectedTime,
+    });
+
+    setToast(successMessage);
     await loadData();
   };
 
@@ -323,6 +380,34 @@ function StaffDashboard() {
             <div className="card glass-card h-100">
               <div className="card-body">
                 <h5 className="fw-bold mb-3 section-title">Meeting Requests</h5>
+
+                <ul className="nav nav-pills mb-3" role="tablist" aria-label="Meeting request tabs">
+                  <li className="nav-item" role="presentation">
+                    <button
+                      type="button"
+                      className={`nav-link ${meetingTab === "student" ? "active" : ""}`}
+                      onClick={() => {
+                        setMeetingTab("student");
+                        setExpandedMeetingId("");
+                      }}
+                    >
+                      Student Requests ({studentRequestedMeetings.length})
+                    </button>
+                  </li>
+                  <li className="nav-item" role="presentation">
+                    <button
+                      type="button"
+                      className={`nav-link ${meetingTab === "staff" ? "active" : ""}`}
+                      onClick={() => {
+                        setMeetingTab("staff");
+                        setExpandedMeetingId("");
+                      }}
+                    >
+                      Staff Requests ({staffRequestedMeetings.length})
+                    </button>
+                  </li>
+                </ul>
+
                 <div className="table-responsive">
                   <table className="table table-modern table-sm align-middle">
                     <thead>
@@ -330,13 +415,14 @@ function StaffDashboard() {
                         <th>Student</th>
                         <th>Type</th>
                         <th>Status</th>
+                        <th>Meeting Time</th>
                         <th>Created</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {meetingRequests.length ? (
-                        meetingRequests.map((meeting) => {
+                      {visibleMeetingRequests.length ? (
+                        visibleMeetingRequests.map((meeting) => {
                           const isExpanded = expandedMeetingId === meeting._id;
 
                           return (
@@ -352,32 +438,87 @@ function StaffDashboard() {
                                   </button>
                                 </td>
                                 <td>{meeting.requestType}</td>
-                                <td>{meeting.status}</td>
+                                <td>{getMeetingStatusLabel(meeting)}</td>
+                                <td>
+                                  {meeting.scheduledAt ? new Date(meeting.scheduledAt).toLocaleString() : "Not assigned"}
+                                </td>
                                 <td>{new Date(meeting.createdAt).toLocaleDateString()}</td>
                                 <td>
-                                  <div className="d-flex gap-2">
-                                    <button
-                                      type="button"
-                                      className="btn btn-sm btn-success"
-                                      disabled={meeting.status !== "Pending"}
-                                      onClick={() => updateMeetingStatus(meeting._id, "Approved")}
-                                    >
-                                      Approve
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="btn btn-sm btn-danger"
-                                      disabled={meeting.status !== "Pending"}
-                                      onClick={() => updateMeetingStatus(meeting._id, "Rejected")}
-                                    >
-                                      Reject
-                                    </button>
+                                  <div className="d-flex flex-column gap-2">
+                                    <input
+                                      type="datetime-local"
+                                      className="form-control form-control-sm"
+                                      value={meetingTimeInputs[meeting._id] || ""}
+                                      onChange={(event) => updateMeetingTimeInput(meeting._id, event.target.value)}
+                                      disabled={meeting.status === "Rejected" || meeting.status === "Completed"}
+                                    />
+                                    <div className="d-flex gap-2">
+                                      {meeting.createdByRole === "student" ? (
+                                        <>
+                                          <button
+                                            type="button"
+                                            className="btn btn-sm btn-success"
+                                            disabled={meeting.status !== "Pending"}
+                                            onClick={() =>
+                                              scheduleMeeting({
+                                                meetingId: meeting._id,
+                                                status: "Approved",
+                                                successMessage: "Request accepted and meeting time set",
+                                              })
+                                            }
+                                          >
+                                            Accept
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="btn btn-sm btn-danger"
+                                            disabled={meeting.status !== "Pending"}
+                                            onClick={() => updateMeetingStatus(meeting._id, "Rejected", meeting.createdByRole)}
+                                          >
+                                            Reject
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <button
+                                            type="button"
+                                            className="btn btn-sm btn-primary"
+                                            disabled={meeting.status === "Rejected" || meeting.status === "Completed"}
+                                            onClick={() =>
+                                              scheduleMeeting({
+                                                meetingId: meeting._id,
+                                                status: "Scheduled",
+                                                successMessage: "Meeting assigned with time",
+                                              })
+                                            }
+                                          >
+                                            Assign Time
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="btn btn-sm btn-success"
+                                            disabled={meeting.status === "Rejected" || meeting.status === "Completed"}
+                                            onClick={() => updateMeetingStatus(meeting._id, "Completed", meeting.createdByRole)}
+                                          >
+                                            Complete
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="btn btn-sm btn-danger"
+                                            disabled={meeting.status === "Rejected" || meeting.status === "Completed"}
+                                            onClick={() => updateMeetingStatus(meeting._id, "Rejected", meeting.createdByRole)}
+                                          >
+                                            Not Completed
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
                                   </div>
                                 </td>
                               </tr>
                               {isExpanded ? (
                                 <tr>
-                                  <td colSpan={5} className="text-muted bg-light">
+                                  <td colSpan={6} className="text-muted bg-light">
                                     <strong>Description:</strong> {meeting.description || "No description provided."}
                                   </td>
                                 </tr>
@@ -387,7 +528,9 @@ function StaffDashboard() {
                         })
                       ) : (
                         <tr>
-                          <td colSpan={5} className="text-muted py-4 text-center">No meeting requests available.</td>
+                          <td colSpan={6} className="text-muted py-4 text-center">
+                            {meetingTab === "student" ? "No student requests available." : "No staff requests available."}
+                          </td>
                         </tr>
                       )}
                     </tbody>
