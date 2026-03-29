@@ -5,12 +5,20 @@ const connectDB = require("../src/config/db");
 const seedData = require("../src/config/seed");
 
 let initPromise;
+let initError;
 
 async function ensureInitialized() {
   if (!initPromise) {
     initPromise = (async () => {
-      await connectDB();
-      await seedData();
+      try {
+        await connectDB();
+        await seedData();
+        initError = null;
+      } catch (error) {
+        initError = error;
+        initPromise = null;
+        throw error;
+      }
     })();
   }
 
@@ -22,7 +30,11 @@ module.exports = async (req, res) => {
     await ensureInitialized();
     return app(req, res);
   } catch (error) {
-    console.error("Vercel function initialization failed", error);
-    return res.status(500).json({ message: "Server initialization failed" });
+    const reason = initError?.message || error?.message || "Unknown initialization error";
+    console.error("Vercel function initialization failed", reason);
+    return res.status(500).json({
+      message: "Server initialization failed",
+      reason,
+    });
   }
 };
