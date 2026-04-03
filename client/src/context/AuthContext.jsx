@@ -1,18 +1,16 @@
 import { createContext, useContext, useMemo, useState } from "react";
 
 const AuthContext = createContext(null);
+const AUTH_STORAGE_KEY = "acadalert-user";
 
 function getStoredUser() {
-  const localValue = localStorage.getItem("acadalert-user");
-  const sessionValue = sessionStorage.getItem("acadalert-user");
-  const saved = localValue || sessionValue;
+  const saved = sessionStorage.getItem(AUTH_STORAGE_KEY);
   if (!saved) return null;
 
   try {
     return JSON.parse(saved);
   } catch {
-    localStorage.removeItem("acadalert-user");
-    sessionStorage.removeItem("acadalert-user");
+    sessionStorage.removeItem(AUTH_STORAGE_KEY);
     return null;
   }
 }
@@ -21,14 +19,12 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(getStoredUser);
 
   const login = (loggedInUser) => {
-    localStorage.setItem("acadalert-user", JSON.stringify(loggedInUser));
-    sessionStorage.setItem("acadalert-user", JSON.stringify(loggedInUser));
+    sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(loggedInUser));
     setUser(loggedInUser);
   };
 
   const logout = () => {
-    localStorage.removeItem("acadalert-user");
-    sessionStorage.removeItem("acadalert-user");
+    sessionStorage.removeItem(AUTH_STORAGE_KEY);
     setUser(null);
   };
 

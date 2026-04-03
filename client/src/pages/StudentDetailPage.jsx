@@ -31,6 +31,14 @@ const RISK_RULES = [
   { rule: "continuousPoorPerformance", description: "Continuous poor performance in two consecutive semesters" },
 ];
 
+const getWarningLevelFromScore = (score) => {
+  const normalized = Number(score) || 0;
+  if (normalized <= 3) return "Safe";
+  if (normalized <= 7) return "Mild Warning";
+  if (normalized <= 12) return "Moderate Warning";
+  return "Severe Academic Warning";
+};
+
 function StudentDetailPage() {
   const { id } = useParams();
   const [student, setStudent] = useState(null);
@@ -270,7 +278,7 @@ function StudentDetailPage() {
                               <td>Sem {record.semester}</td>
                               <td>{record.cgpa}</td>
                               <td>{record.riskScore || 0}</td>
-                              <td>{record.warningLevel || "Safe"}</td>
+                              <td>{getWarningLevelFromScore(record.riskScore)}</td>
                             </tr>
                           ))}
                       </tbody>

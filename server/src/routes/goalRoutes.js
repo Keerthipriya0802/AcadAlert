@@ -52,26 +52,49 @@ router.post("/goals", async (req, res) => {
 
 router.get("/goals", async (req, res) => {
   try {
-    const { studentId, department } = req.query;
+    const { studentId, department, role, userId } = req.query;
 
     const query = {};
     if (studentId) query.student = studentId;
 
     const goals = await Goal.find(query)
-      .populate("student", "studentName registerNumber department")
+      .populate("student", "studentName registerNumber department assignedStaff")
       .sort({ createdAt: -1 })
       .lean();
+    // Staff view: goals for their assigned students or goals they created,
+    // without depending on how departments are typed.
+    if (role === "staff" && userId && !studentId) {
+      const viewerId = String(userId);
+      const staffGoals = goals.filter((goal) => {
+        const assignedStaffId = goal.student?.assignedStaff;
+        const assignedIdString = assignedStaffId ? String(assignedStaffId) : "";
+        const createdByString = goal.createdBy ? String(goal.createdBy) : "";
 
-    if (!department) {
-      return res.json(goals);
+        // Goals for students assigned to this staff
+        if (assignedIdString === viewerId) return true;
+
+        // Goals explicitly created by this staff
+        if (createdByString === viewerId) return true;
+
+        return false;
+      });
+
+      return res.json(staffGoals);
     }
 
-    const requestedDepartment = normalizeDepartment(department);
-    const filteredGoals = goals.filter(
-      (goal) => normalizeDepartment(goal.student?.department) === requestedDepartment
-    );
+    // Student / coordinator views: keep optional department-based filtering.
+    let filtered = goals;
 
-    return res.json(filteredGoals);
+    if (department) {
+      const effectiveDepartment = normalizeDepartment(department);
+      if (effectiveDepartment) {
+        filtered = filtered.filter(
+          (goal) => normalizeDepartment(goal.student?.department) === effectiveDepartment
+        );
+      }
+    }
+
+    return res.json(filtered);
   } catch (error) {
     return res.status(500).json({ message: "Failed to fetch goals", error: error.message });
   }

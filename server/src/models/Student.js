@@ -1,5 +1,9 @@
 const mongoose = require("mongoose");
 
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
 const semesterPerformanceSchema = new mongoose.Schema(
   {
     semester: { type: Number, required: true },
@@ -14,7 +18,7 @@ const studentSchema = new mongoose.Schema(
   {
     studentName: { type: String, required: true },
     registerNumber: { type: String, required: true, unique: true },
-    emailId: { type: String, default: "" },
+    emailId: { type: String, default: "", set: normalizeEmail },
     profileDescription: { type: String, default: "" },
     department: { type: String, required: true },
     semester: { type: Number, required: true },

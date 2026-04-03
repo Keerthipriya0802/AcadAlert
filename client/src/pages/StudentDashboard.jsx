@@ -157,32 +157,44 @@ function StudentDashboard() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function loadStudent() {
-      setLoading(true);
-      try {
-        const response = await api.get(`/students/student-user/${user.id}`);
-        setStudent(response.data);
+  const loadStudentDashboard = async ({ showLoader = false } = {}) => {
+    if (!user?.id) return;
 
-        const [meetingsRes, goalsRes] = await Promise.all([
-          api.get("/meeting-requests", {
-            params: { studentId: response.data._id },
-          }),
-          api.get("/goals", {
-            params: { studentId: response.data._id },
-          }),
-        ]);
+    if (showLoader) setLoading(true);
 
-        setMeetingRequests(meetingsRes.data);
-        setGoals(goalsRes.data);
-      } catch (err) {
-        setError(err?.response?.data?.message || "Failed to load student dashboard");
-      } finally {
-        setLoading(false);
-      }
+    try {
+      const response = await api.get(`/students/student-user/${user.id}`);
+      setStudent(response.data);
+
+      const [meetingsRes, goalsRes] = await Promise.all([
+        api.get("/meeting-requests", {
+          params: { studentId: response.data._id },
+        }),
+        api.get("/goals", {
+          params: { studentId: response.data._id },
+        }),
+      ]);
+
+      setMeetingRequests(meetingsRes.data);
+      setGoals(goalsRes.data);
+      setError("");
+    } catch (err) {
+      setError(err?.response?.data?.message || "Failed to load student dashboard");
+    } finally {
+      if (showLoader) setLoading(false);
     }
+  };
 
-    if (user?.id) loadStudent();
+  useEffect(() => {
+    if (!user?.id) return;
+
+    loadStudentDashboard({ showLoader: true });
+
+    const interval = setInterval(() => {
+      loadStudentDashboard();
+    }, 15000);
+
+    return () => clearInterval(interval);
   }, [user?.id]);
 
   const criteriaCards = useMemo(() => {
@@ -271,6 +283,7 @@ function StudentDashboard() {
   const getMeetingStatusLabel = (meeting) => {
     if (meeting.createdByRole === "student") {
       if (meeting.status === "Approved") return "Accepted";
+      if (meeting.status === "Scheduled") return "Accepted";
       return meeting.status;
     }
 

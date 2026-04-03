@@ -29,8 +29,25 @@ function getFirebaseAuth() {
   return admin.auth();
 }
 
-function escapeRegex(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function buildStudentEmailQuery(email) {
+  return {
+    $expr: {
+      $eq: [
+        {
+          $toLower: {
+            $trim: {
+              input: { $ifNull: ["$emailId", ""] },
+            },
+          },
+        },
+        email,
+      ],
+    },
+  };
 }
 
 function generateTemporaryPassword(length = 10) {
@@ -46,11 +63,12 @@ function generateTemporaryPassword(length = 10) {
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail || !password) {
       return res.status(400).json({ message: "Email and password are required." });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user || user.password !== password) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
@@ -85,7 +103,7 @@ router.post("/firebase-login", async (req, res) => {
 
     const decodedToken = await firebaseAuth.verifyIdToken(idToken);
 
-    const email = decodedToken?.email?.toLowerCase();
+    const email = normalizeEmail(decodedToken?.email);
     const isEmailVerified = Boolean(decodedToken?.email_verified);
     if (!email || !isEmailVerified) {
       return res.status(401).json({ message: "Firebase account email is not verified." });
@@ -93,8 +111,9 @@ router.post("/firebase-login", async (req, res) => {
 
     let user = await User.findOne({ email });
     if (!user) {
-      const emailPattern = new RegExp(`^${escapeRegex(email)}$`, "i");
-      const student = await Student.findOne({ emailId: emailPattern }).select("_id studentName department linkedUser");
+      const student = await Student.findOne(buildStudentEmailQuery(email)).select(
+        "_id studentName department linkedUser"
+      );
 
       if (!student) {
         return res.status(403).json({ message: "No account found for this Firebase email." });
@@ -129,7 +148,7 @@ router.post("/firebase-login", async (req, res) => {
 router.post("/staff", async (req, res) => {
   try {
     const name = String(req.body?.name || "").trim();
-    const email = String(req.body?.email || "").trim().toLowerCase();
+    const email = normalizeEmail(req.body?.email);
 
     if (!name || !email) {
       return res.status(400).json({ message: "Name and email are required." });
@@ -167,7 +186,7 @@ router.post("/staff", async (req, res) => {
 router.put("/staff/:id", async (req, res) => {
   try {
     const name = String(req.body?.name || "").trim();
-    const email = String(req.body?.email || "").trim().toLowerCase();
+    const email = normalizeEmail(req.body?.email);
 
     if (!name || !email) {
       return res.status(400).json({ message: "Name and email are required." });

@@ -1,6 +1,7 @@
 const express = require("express");
 const MeetingRequest = require("../models/MeetingRequest");
 const Student = require("../models/Student");
+const User = require("../models/User");
 
 const router = express.Router();
 
@@ -48,20 +49,51 @@ router.post("/meeting-request", async (req, res) => {
 
 router.get("/meeting-requests", async (req, res) => {
   try {
-    const { department, studentId } = req.query;
+    const { department, studentId, role, userId } = req.query;
+    const findQuery = {};
+    if (studentId) {
+      findQuery.student = studentId;
+    }
 
-    const meetings = await MeetingRequest.find()
+    const meetings = await MeetingRequest.find(findQuery)
       .populate("student")
       .sort({ createdAt: -1 })
       .lean();
 
-    const requestedDepartment = normalizeDepartment(department);
-    let filtered = requestedDepartment
-      ? meetings.filter((meeting) => normalizeDepartment(meeting.student?.department) === requestedDepartment)
-      : meetings;
+    // Staff view: focus on meetings linked to their students or created by them,
+    // independent of free-text department naming.
+    if (role === "staff" && userId) {
+      const viewerId = String(userId);
+      const staffMeetings = meetings.filter((meeting) => {
+        const assignedStaffId = meeting.student?.assignedStaff;
+        const assignedIdString = assignedStaffId ? String(assignedStaffId) : "";
+        const requestedByString = meeting.requestedBy ? String(meeting.requestedBy) : "";
 
-    if (studentId) {
-      filtered = filtered.filter((meeting) => String(meeting.student?._id) === String(studentId));
+        // Meetings for students assigned to this staff
+        if (assignedIdString === viewerId) return true;
+
+        // Meetings created by this staff (even if student later reassigned)
+        if (requestedByString === viewerId) return true;
+
+        // Optionally include unassigned students so staff can still respond
+        if (!assignedStaffId) return true;
+
+        return false;
+      });
+
+      return res.json(staffMeetings);
+    }
+
+    // Default / coordinator / student views: optional department-based filtering.
+    let filtered = meetings;
+
+    if (department) {
+      const effectiveDepartment = normalizeDepartment(department);
+      if (effectiveDepartment) {
+        filtered = filtered.filter(
+          (meeting) => normalizeDepartment(meeting.student?.department) === effectiveDepartment
+        );
+      }
     }
 
     return res.json(filtered);

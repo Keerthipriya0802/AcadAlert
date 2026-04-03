@@ -27,8 +27,25 @@ function normalizeDepartment(value) {
   return DEPARTMENT_ALIAS_MAP[normalized] || normalized;
 }
 
-function escapeRegex(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function buildStudentEmailQuery(email) {
+  return {
+    $expr: {
+      $eq: [
+        {
+          $toLower: {
+            $trim: {
+              input: { $ifNull: ["$emailId", ""] },
+            },
+          },
+        },
+        email,
+      ],
+    },
+  };
 }
 
 const LEGACY_PARAMETER_TO_KEY = {
@@ -213,8 +230,10 @@ router.get("/student-user/:userId", async (req, res) => {
       .lean();
 
     if (!student && user.email) {
-      const emailPattern = new RegExp(`^${escapeRegex(user.email)}$`, "i");
-      const matchedByEmail = await Student.findOne({ emailId: emailPattern }).select("_id linkedUser").lean();
+        const normalizedUserEmail = normalizeEmail(user.email);
+        const matchedByEmail = await Student.findOne(buildStudentEmailQuery(normalizedUserEmail))
+          .select("_id linkedUser")
+          .lean();
 
       if (matchedByEmail) {
         await Student.findByIdAndUpdate(matchedByEmail._id, { linkedUser: user._id }, { runValidators: true });
@@ -256,6 +275,10 @@ router.get("/:id", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const payload = { ...req.body };
+      if (Object.prototype.hasOwnProperty.call(payload, "emailId")) {
+        payload.emailId = normalizeEmail(payload.emailId);
+      }
+
     const assignedStaff = await resolveAssignedStaff(payload.assignedStaff);
     if (assignedStaff !== undefined) {
       payload.assignedStaff = assignedStaff;
@@ -272,6 +295,10 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const updatePayload = { ...req.body };
+    if (Object.prototype.hasOwnProperty.call(updatePayload, "emailId")) {
+      updatePayload.emailId = normalizeEmail(updatePayload.emailId);
+    }
+
     const assignedStaff = await resolveAssignedStaff(updatePayload.assignedStaff);
     if (assignedStaff !== undefined) {
       updatePayload.assignedStaff = assignedStaff;

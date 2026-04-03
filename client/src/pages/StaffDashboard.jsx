@@ -62,17 +62,27 @@ function StaffDashboard() {
           search: filters.search || undefined,
         },
       }),
-      api.get("/meeting-requests", { params: { department: user.department || undefined } }),
-      api.get("/goals", { params: { department: user.department || undefined } }),
+      api.get("/meeting-requests", {
+        params: {
+          department: user.department || undefined,
+          role: "staff",
+          userId: user.id,
+        },
+      }),
+      api.get("/goals", {
+        params: {
+          department: user.department || undefined,
+          role: "staff",
+          userId: user.id,
+        },
+      }),
     ]);
 
     const assignedStudents = studentsRes.data;
     const assignedStudentIds = new Set(assignedStudents.map((student) => String(student._id)));
 
     setStudents(assignedStudents);
-    setMeetingRequests(
-      meetingsRes.data.filter((meeting) => assignedStudentIds.has(String(meeting.student?._id)))
-    );
+    setMeetingRequests(meetingsRes.data);
     setGoals(goalsRes.data.filter((goal) => assignedStudentIds.has(String(goal.student?._id))));
   };
 

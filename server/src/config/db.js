@@ -1,11 +1,10 @@
 const mongoose = require("mongoose");
 
 async function connectDB() {
-  const isVercel = Boolean(process.env.VERCEL);
-  const mongoUri = process.env.MONGO_URI || (!isVercel ? "mongodb://127.0.0.1:27017/acadalert" : "");
+  const mongoUri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/acadalert";
 
   if (!mongoUri) {
-    throw new Error("MONGO_URI is missing. Set it in Vercel Project Settings -> Environment Variables.");
+    throw new Error("MONGO_URI is missing. Set it in your environment configuration.");
   }
 
   await mongoose.connect(mongoUri);

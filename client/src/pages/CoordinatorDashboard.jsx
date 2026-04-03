@@ -94,6 +94,14 @@ const toNumber = (value, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const getWarningLevelFromScore = (score) => {
+  const normalized = Number(score) || 0;
+  if (normalized <= 3) return "Safe";
+  if (normalized <= 7) return "Mild Warning";
+  if (normalized <= 12) return "Moderate Warning";
+  return "Severe Academic Warning";
+};
+
 const DEPARTMENT_ALIAS_MAP = {
   CSE: "CSE",
   "COMPUTER SCIENCE": "CSE",
@@ -272,12 +280,13 @@ function CoordinatorDashboard() {
       const semester = index + 1;
       const prevRecord = existingHistory.find((record) => Number(record.semester) === semester) || {};
       const sgpa = toNumber(semesterSgpa[index], 0);
+      const riskScore = toNumber(semesterRiskScores[index], toNumber(prevRecord.riskScore, 0));
 
       return {
         semester,
         cgpa: sgpa,
-        riskScore: toNumber(semesterRiskScores[index], toNumber(prevRecord.riskScore, 0)),
-        warningLevel: prevRecord.warningLevel || "Safe",
+        riskScore,
+        warningLevel: getWarningLevelFromScore(riskScore),
       };
     });
 
